@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:file="http://www.mulesoft.org/schema/mule/file" xmlns:http="http://www.mulesoft.org/schema/mule/http"
+	xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core"
+	xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.mulesoft.org/schema/mule/file http://www.mulesoft.org/schema/mule/file/current/mule-file.xsd">
+	<http:request-config name="HTTP_Request_configuration" doc:name="HTTP Request configuration" doc:id="47c5f795-9191-4304-aa95-9a574038a7cb" >
+		<http:request-connection protocol="HTTPS" host="us-weather-by-zip-code.p.rapidapi.com" />
+	</http:request-config>
+	<http:request-config name="HTTP_Request_configuration1" doc:name="HTTP Request configuration" doc:id="1ce2de20-6609-479e-a515-2825fcc71c5e" >
+		<http:request-connection host="us-weather-by-zip-code.p.rapidapi.com" protocol="HTTPS"/>
+	</http:request-config>
+	<flow name="weather-info-flow" doc:id="820ab269-4c03-474a-9d35-c0234b97a302" >
+		<logger level="INFO" doc:name="Logger" doc:id="8f7dee2c-4496-4d57-ad13-4d081ff02780" />
+		<set-variable value="#[attributes.queryParams.ipAddress]" doc:name="Set ipAddress" doc:id="1beaca8f-2826-4807-ae9d-bb4a2f303752" variableName="ipAddress"/>
+		<logger level="INFO" doc:name="Logger" doc:id="1917d67e-9ba8-4325-a99f-a0d4d4bfaac0" message="#[vars.ipAddress]"/>
+		<http:request method="GET" doc:name="Request Location Info" doc:id="703b347b-842d-4f2e-9762-694828955680" config-ref="HTTP_Request_configuration" path='#["/ip/"++ vars.ipAddress]'>
+			<http:headers ><![CDATA[#[output application/java
+---
+{
+	"x-rapidapi-key" : "abce623cfbmshe9a697227293beap189712jsn1add6966ddec",
+	"x-rapidapi-host" : "ip-geo-location.p.rapidapi.com",
+	"useQueryString" : true
+}]]]></http:headers>
+		</http:request>
+		<ee:transform doc:name="Transform Message" doc:id="0ea70a2b-1f76-4395-84e2-7ebfb7acd658" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+payload]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<logger level="INFO" doc:name="Logger" doc:id="71b5d86c-bc30-4328-8029-200dd09e5e9d" message="#[payload]" />
+		<http:request method="GET" doc:name="Request Weather by Zip" doc:id="f72f6d65-6113-45c5-b5fb-ec2cf3defabc" config-ref="HTTP_Request_configuration1" path='/getweatherzipcode'>
+			<http:headers><![CDATA[#[output application/java
+---
+{
+	"x-rapidapi-key" : "abce623cfbmshe9a697227293beap189712jsn1add6966ddec",
+	"x-rapidapi-host" : "us-weather-by-zip-code.p.rapidapi.com",
+	"useQueryString" : true
+}]]]></http:headers>
+			<http:query-params ><![CDATA[#[output application/java
+---
+{
+	"zip" : payload.postcode
+}]]]></http:query-params>
+		</http:request>
+		<logger level="INFO" doc:name="Logger" doc:id="3f7d143c-4166-47cf-acf5-ce07f7adfed4" message="#[payload]"/>
+		<ee:transform doc:name="Transform Message" doc:id="c42bfc48-11c2-48cb-bf85-713ff0d10460" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+{
+  CurrentTemp: payload.TempF,
+  Outlook: payload.Weather,
+  City: payload.City,
+  State: payload.State
+}]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<error-handler >
+			<on-error-propagate enableNotifications="true" logException="true" doc:name="On Error Propagate" doc:id="d6e84f12-8b70-42f6-a5bc-25327544de5d" >
+				<set-payload value="#[error.detailedDescription]" doc:name="Set Payload" doc:id="e82cb625-5ae0-4875-ae0c-cac9478416f4" />
+			</on-error-propagate>
+		</error-handler>
+	</flow>
+</mule>
